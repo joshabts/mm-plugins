@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE muclient>
+<!-- Saved on Wednesday, August 24, 2011, 7:17 AM -->
+<!-- MuClient version 4.73 -->
+
+<muclient>
+
+<plugin
+   name="item_scraper"
+   author="Nisin"
+   id="58e916cdd4a7c970ed8cd722"
+   language="Lua"
+   purpose="Scrapes items you see and saves them to a database for later processing."
+   save_state="y"
+   date_written="2017-12-05 23:22:59"
+   date_modified="2017-12-05 23:22:59"
+   requires="4.71"
+   version="1.01"
+   >
+
+<description trim="y">
+
+<![CDATA[
+
+.----------------.
+ | item_scraper  |
+`----------------'
+
+Scrapes items and saves them to a database for later processing.
+
+
+** REQUIRES **
+
+- MM_GMCP_Handler (plugin id="f67c4339ed0591a5b010d05b") must be installed and enabled.
+- detect_globals (plugin id="d900cb999816b1f6f2d4bdc5") must be installed and enabled.
+- global_vars (plugin id="97784abf5f30629a0d7e7307") must be installed and enabled.
+
+
+Syntax:
+
+
+
+
+Author: Nisin
+
+Latest version:
+
+
+]]>
+
+</description>
+
+</plugin>
+
+
+
+<!--  Aliases  -->
+
+<aliases>
+
+<!--  Plugin help  -->
+
+  <alias
+   enabled="y"
+   match="^item_scraper(|( |\:)help)$"
+   regexp="y"
+   ignore_case="y"
+   script="OnHelp"
+  >
+  </alias>
+
+</aliases>
+
+
+
+<!--  Triggers  -->
+
+<triggers>
+
+<!-- on first prompt -->
+
+  <trigger
+   enabled="y"
+   name="first_prompt"
+   keep_evaluating="y"
+   match="^(|[^ ]+(.*?))(\&lt;(.+)hp (.+)sp (.+)st\&gt;|\(.+\)|\&gt;) $"
+   regexp="y"
+   send_to="12"
+   sequence="100"
+  >
+  <send>on_first_prompt()
+</send>
+  </trigger>
+
+
+  <trigger
+   keep_evaluating="y"
+   match="^(?:[\[&lt;]|\(Mount)"
+   name="itemStopper"
+   regexp="y"
+   send_to="12"
+   sequence="40"
+  >
+  <send>do_data_upload()
+</send>
+  </trigger>
+
+  <trigger
+   keep_evaluating="y"
+   match="*"
+   name="itemLine"
+   send_to="12"
+   sequence="50"
+  >
+  <send>grab_data("%0", item_info)</send>
+  </trigger>
+
+  <trigger
+   enabled="y"
+   keep_evaluating="y"
+   match="^You focus your powers of observation on (.+):"
+   name="itemStart"
+   regexp="y"
+   send_to="12"
+   sequence="100"
+  >
+  <send>start_id()
+</send>
+  </trigger>
+
+
+
+</triggers>
+
+
+
+<!--  Scripts  -->
+
+<script>
+
+<![CDATA[
+
+require "serialize"
+require "wait"
+
+
+-----------
+-- plugin
+-----------
+
+function OnPluginInstall()
+  wait.make(function()
+    Tell("-- " .. GetPluginInfo(GetPluginID (), 1) .. ": type ")
+    ColourTell("silver", "black", GetPluginInfo(GetPluginID (), 1) .. " help")
+    Note(" to see info about this plugin --")
+
+    EnableTrigger("first_prompt", true)
+    name = nil
+    
+    -- give the plugins time to initialize
+    wait.time(3)
+  end)
+end
+
+
+function OnPluginConnect()
+  EnableTrigger("first_prompt", true)
+  name = nil
+end
+
+
+function is_plugin_present(name, id)
+  local res = false
+
+  local plugin_name = GetPluginInfo(id, 1)
+
+  if (plugin_name == name) then
+    -- is it enabled?
+    if (GetPluginInfo(id, 17)) then
+      res = true
+    end
+  end
+
+  return res
+end
+
+
+function OnHelp()
+  ColourNote("silver", "black", world.GetPluginInfo(world.GetPluginID (), 3))
+  Note("")
+  ColourNote("silver", "black", "(this version: " .. os.date("%c", GetPluginInfo (GetPluginID(), 14)) .. ")")
+end
+
+
+function plugin_not_initialized()
+  Note("-- " .. GetPluginInfo(GetPluginID (), 1) .. ": plugin initialization unfinished --")
+  Note("please wait 5 seconds and try again")
+end
+
+
+function plugin_update_url()
+  local t = {
+    "http://api.mmwiki.org/item_scraper.xml",
+  }
+  return (table.concat(t, ";"))
+end
+
+
+
+------------
+-- general
+------------
+
+function start_id()
+	SetVariable("itemDesc","")
+	EnableTrigger("itemStopper",true)
+	EnableTrigger("itemLine",true)
+end
+
+function grab_data(data)
+	if "%0" ~= "[C]ontinue [R]edraw [B]ack [E]xit: " then
+	  curStr = GetVariable("itemDesc")
+	  curStr = curStr..data.."\n"
+	  SetVariable("itemDesc",curStr)
+	end
+end
+
+function do_data_upload(item_info)
+	EnableTrigger("itemStopper",false)
+	EnableTrigger("itemLine",false)
+	item_info = GetVariable("itemDesc")
+--	Note(item_info)
+	local http = require "socket.http"
+    local ltn12 = require "ltn12"
+    local reqbody = "submitter="..name.."&data="..url_encode(item_info)
+    local respbody = {} -- for the response body
+
+    local result, respcode, respheaders, respstatus = http.request {
+        method = "POST",
+        url = "http://api.mmwiki.org/saveItem.php",
+        source = ltn12.source.string(reqbody),
+        headers = {
+            ["content-type"] = "application/x-www-form-urlencoded",
+            ["content-length"] = tostring(#reqbody)
+        },
+        sink = ltn12.sink.table(respbody)
+    }
+end
+
+
+
+function get_global_var(name)
+  local res, val
+
+  res, val = CallPlugin("97784abf5f30629a0d7e7307", "get_global_var", name)
+
+  if (res ~= 0) then
+    val = nil
+  end
+
+  return val
+end
+
+
+function url_encode(str)
+  if (str) then
+    str = string.gsub (str, "\n", "\r\n")
+    str = string.gsub (str, "([^%w %-%_%.%~])",
+        function (c) return string.format ("%%%02X", string.byte(c)) end)
+    str = string.gsub (str, " ", "+")
+  end
+  return str	
+end
+
+
+---------
+-- name
+---------
+
+function on_first_prompt()
+  wait.make(function()
+    EnableTrigger("first_prompt", false)
+  
+    -- give the plugins time to initialize
+    wait.time(3)
+  
+    do_get_name()
+  end)
+end
+
+
+function OnPluginBroadcast(msg, id, pname, text)
+  if (id =="97784abf5f30629a0d7e7307")
+  and (pname == "global_vars") then -- global_vars
+    if (msg == 1) and (text == "name") then
+      -- name broadcasted      
+      do_get_name()
+    end
+  end
+end
+
+
+function do_get_name()
+  name = get_global_var("name")
+  
+end
+
+
+]]>
+
+</script>
+
+</muclient>
+
