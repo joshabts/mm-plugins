@@ -245,6 +245,8 @@ function do_data_upload(item_info)
         },
         sink = ltn12.sink.table(respbody)
     }
+    respbody = table.concat(respbody)
+    ColourNote("silver","black", respbody)
 end
 
 
