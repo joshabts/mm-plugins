@@ -200,7 +200,7 @@ end
 
 function plugin_update_url()
   local t = {
-    "http://api.mmwiki.org/item_scraper.xml",
+    "https://raw.githubusercontent.com/joshabts/mm-plugins/master/item_scraper.xml",
   }
   return (table.concat(t, ";"))
 end
