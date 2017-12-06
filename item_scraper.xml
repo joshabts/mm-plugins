@@ -95,7 +95,7 @@ Latest version:
 
   <trigger
    keep_evaluating="y"
-   match="^(?:\[\*|\[AWAY|&lt;|\(Mount)"
+   match="^(?:\[\*|\[AWAY|\[o|&lt;|\(Mount)"
    name="itemStopper"
    regexp="y"
    send_to="12"
